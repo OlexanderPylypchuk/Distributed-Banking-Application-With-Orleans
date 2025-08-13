@@ -8,7 +8,7 @@ builder.Host.UseOrleansClient((context, client) =>
 {
     client.UseAzureStorageClustering(options =>
     {
-        options.TableServiceClient = new Azure.Data.Tables.TableServiceClient("UseDevelopementStorage=true;");
+        options.TableServiceClient = new Azure.Data.Tables.TableServiceClient("UseDevelopmentStorage=true;");
     });
 
     client.Configure<ClusterOptions>(options =>
@@ -40,4 +40,27 @@ app.MapPost("checkingaccount", async (IClusterClient client, CreateAccount creat
 
     return TypedResults.Created($"checkingaccount/{checkingAccountId}");
 });
+
+app.MapPost("checkingaccount/{checkingAccountId}/debit", async (Guid checkingAccountId, IClusterClient client, Debit debit) =>
+{
+    var checkinAccountGrain = client.GetGrain<ICheckingAccountGrain>(checkingAccountId);
+
+    await checkinAccountGrain.Debit(debit.Amount);
+
+    return TypedResults.NoContent();
+});
+
+app.MapPost("checkingaccount/{checkingAccountId}/credit", async (Guid checkingAccountId, IClusterClient client, Credit credit) =>
+{
+    var checkinAccountGrain = client.GetGrain<ICheckingAccountGrain>(checkingAccountId);
+
+    await checkinAccountGrain.Credit(credit.Amount);
+
+    return TypedResults.NoContent();
+});
+
+
+
 app.Run();
+
+

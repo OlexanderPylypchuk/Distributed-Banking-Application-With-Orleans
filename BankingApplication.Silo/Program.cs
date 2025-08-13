@@ -6,13 +6,23 @@ await Host.CreateDefaultBuilder(args)
     {
         siloBuilder.UseAzureStorageClustering(options =>
         {
-            options.TableServiceClient = new Azure.Data.Tables.TableServiceClient("UseDevelopementStorage=true;");
+            options.TableServiceClient = new Azure.Data.Tables.TableServiceClient("UseDevelopmentStorage=true;");
         });
 
         siloBuilder.Configure<ClusterOptions>(options =>
         {
             options.ClusterId = "Cluster";
             options.ServiceId = "Service";
+        });
+
+        siloBuilder.AddAzureTableGrainStorage("TableStorage", configureOptions: options =>
+        {
+            options.TableServiceClient = new Azure.Data.Tables.TableServiceClient("UseDevelopmentStorage=true;");
+        });
+
+        siloBuilder.AddAzureBlobGrainStorage("BlobStorage", configureOptions: options =>
+        {
+            options.BlobServiceClient = new Azure.Storage.Blobs.BlobServiceClient("UseDevelopmentStorage=true;");
         });
 
         //siloBuilder.Configure<GrainCollectionOptions>(options =>
