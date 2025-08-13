@@ -6,5 +6,6 @@
         Task<decimal> GetBalance();
         Task Debit(decimal amount);
         Task Credit(decimal amount);
+        Task AddReccuringPayment(Guid id, decimal amount, int reccursEveryMinutes);
     }
 }

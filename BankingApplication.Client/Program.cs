@@ -1,5 +1,6 @@
 using BankingApplication.Client.Contracts;
 using BankingApplication.Grains.Abstractions;
+using BankingApplication.Grains.Grains;
 using Orleans.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -55,6 +56,35 @@ app.MapPost("checkingaccount/{checkingAccountId}/credit", async (Guid checkingAc
     var checkinAccountGrain = client.GetGrain<ICheckingAccountGrain>(checkingAccountId);
 
     await checkinAccountGrain.Credit(credit.Amount);
+
+    return TypedResults.NoContent();
+});
+
+app.MapPost("checkingaccount/{checkingAccountId}/reccuringPayment", async (Guid checkingAccountId, IClusterClient client, CreateReccuringPayment createReccuringPayment) =>
+{
+    var checkinAccountGrain = client.GetGrain<ICheckingAccountGrain>(checkingAccountId);
+
+    await checkinAccountGrain.AddReccuringPayment(createReccuringPayment.PaymentId, createReccuringPayment.Amount, createReccuringPayment.ReccursEveryMinutes);
+
+    return TypedResults.NoContent();
+});
+
+app.MapPost("atm", async (IClusterClient client, CreateAtm createAtm) =>
+{
+    var atmId = Guid.NewGuid();
+
+    var atmGrain = client.GetGrain<IAtmGrain>(atmId);
+
+    await atmGrain.Initialize(createAtm.OpeningBalance);
+
+    return TypedResults.Created($"atm/{atmId}");
+});
+
+app.MapPost("atm/{atmId}/credit", async (Guid atmId, IClusterClient client, AtmWithdrawl withdrawl) =>
+{
+    var atmGrain = client.GetGrain<IAtmGrain>(atmId);
+
+    await atmGrain.Withdraw(withdrawl.CheckingAccountId, withdrawl.Amount);
 
     return TypedResults.NoContent();
 });

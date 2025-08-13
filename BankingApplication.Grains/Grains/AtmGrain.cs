@@ -1,17 +1,30 @@
 ﻿using BankingApplication.Grains.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using BankingApplication.Grains.States;
 
 namespace BankingApplication.Grains.Grains
 {
     public class AtmGrain : Grain, IAtmGrain
     {
-        public Task Withdraw(Guid CheckingAccountId, decimal amount)
+        private readonly IPersistentState<AtmState> _atmState;
+        public AtmGrain([PersistentState("atm", "TableStorage")] IPersistentState<AtmState> atmState)
         {
-            throw new NotImplementedException();
+            _atmState = atmState;
+        }
+        public async Task Initialize(decimal openingBalance)
+        {
+            _atmState.State.Balance = openingBalance;
+            _atmState.State.Id = this.GetGrainId().GetGuidKey();
+        }
+
+        public async Task Withdraw(Guid CheckingAccountId, decimal amount)
+        {
+            var checkingAccount = this.GrainFactory.GetGrain<ICheckingAccountGrain>(CheckingAccountId);
+
+            await checkingAccount.Debit(amount);
+
+            _atmState.State.Balance -= amount;
+
+            await _atmState.WriteStateAsync();
         }
     }
 }

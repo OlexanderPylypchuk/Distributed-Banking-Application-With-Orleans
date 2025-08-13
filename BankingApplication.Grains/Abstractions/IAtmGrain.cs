@@ -6,8 +6,9 @@ using System.Threading.Tasks;
 
 namespace BankingApplication.Grains.Abstractions
 {
-    internal interface IAtmGrain:  IGrainWithGuidKey
+    public interface IAtmGrain:  IGrainWithGuidKey
     {
+        public Task Initialize(decimal openingBalance);
         public Task Withdraw(Guid CheckingAccountId, decimal amount);
     }
 }

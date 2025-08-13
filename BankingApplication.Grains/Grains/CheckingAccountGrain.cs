@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace BankingApplication.Grains.Grains
 {
-    public class CheckingAccountGrain : Grain, ICheckingAccountGrain
+    public class CheckingAccountGrain : Grain, ICheckingAccountGrain, IRemindable
     {
         private readonly IPersistentState<BalanceState> _balanceState;
         private readonly IPersistentState<CheckingAccountState> _checkingAccountState;
@@ -18,6 +18,21 @@ namespace BankingApplication.Grains.Grains
             _balanceState = balanceState;
             _checkingAccountState = checkingAccountState;
         }
+
+        public async Task AddReccuringPayment(Guid id, decimal amount, int reccursEveryMinutes)
+        {
+            _checkingAccountState.State.ReccuringPayments.Add(new ReccuringPayment{
+                PaymentId = id,
+                Amount = amount,
+                OccursEveryMinutes = reccursEveryMinutes
+            });
+
+            await _checkingAccountState.WriteStateAsync();
+
+            await this.RegisterOrUpdateReminder($"ReccurintPayment:::{id}", 
+                TimeSpan.FromMinutes(reccursEveryMinutes), TimeSpan.FromMinutes(reccursEveryMinutes));
+        }
+
         public async Task Credit(decimal amount)
         {
             var currentBalance = _balanceState.State.Balance;
@@ -52,6 +67,18 @@ namespace BankingApplication.Grains.Grains
             _checkingAccountState.State.Accountid = this.GetGrainId().GetGuidKey();
 
             _balanceState.State.Balance = openingBalance;
+        }
+
+        public async Task ReceiveReminder(string reminderName, TickStatus status)
+        {
+            if (reminderName.StartsWith("ReccurintPayment"))
+            {
+                var reccuringPaymentId = Guid.Parse(reminderName.Split(":::").Last());
+
+                var reccuringPayment = _checkingAccountState.State.ReccuringPayments.Where(p => p.PaymentId == reccuringPaymentId).Single();
+
+                await Debit(reccuringPayment.Amount);
+            }
         }
     }
 }

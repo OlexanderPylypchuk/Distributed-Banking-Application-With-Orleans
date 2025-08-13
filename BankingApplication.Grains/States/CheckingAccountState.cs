@@ -15,5 +15,7 @@ namespace BankingApplication.Grains.States
         public DateTime CreatedAtUtc { get; set; }
         [Id(2)]
         public string AccountType { get; set; }
+        [Id(3)]
+        public List<ReccuringPayment> ReccuringPayments { get; set; }
     }
 }
