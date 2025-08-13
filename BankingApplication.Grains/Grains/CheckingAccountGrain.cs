@@ -1,5 +1,7 @@
 ﻿using BankingApplication.Grains.Abstractions;
 using BankingApplication.Grains.States;
+using Orleans.Concurrency;
+using Orleans.Transactions.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,15 +10,19 @@ using System.Threading.Tasks;
 
 namespace BankingApplication.Grains.Grains
 {
+    [Reentrant]
     public class CheckingAccountGrain : Grain, ICheckingAccountGrain, IRemindable
     {
-        private readonly IPersistentState<BalanceState> _balanceState;
+        private readonly ITransactionClient _transactionClient;
+        private readonly ITransactionalState<BalanceState> _balanceState;
         private readonly IPersistentState<CheckingAccountState> _checkingAccountState;
-        public CheckingAccountGrain([PersistentState("balance", "TableStorage")]IPersistentState<BalanceState> balanceState,
-            [PersistentState("checkingAccount", "BlobStorage")] IPersistentState<CheckingAccountState> checkingAccountState)
+        public CheckingAccountGrain([TransactionalState("balance")] ITransactionalState<BalanceState> balanceState,
+            [PersistentState("checkingAccount", "BlobStorage")] IPersistentState<CheckingAccountState> checkingAccountState,
+            ITransactionClient transactionClient)
         {
             _balanceState = balanceState;
             _checkingAccountState = checkingAccountState;
+            _transactionClient = transactionClient;
         }
 
         public async Task AddReccuringPayment(Guid id, decimal amount, int reccursEveryMinutes)
@@ -35,38 +41,39 @@ namespace BankingApplication.Grains.Grains
 
         public async Task Credit(decimal amount)
         {
-            var currentBalance = _balanceState.State.Balance;
-            
-            var newstate = currentBalance + amount;
-
-            _balanceState.State.Balance = newstate;
-
-            await _balanceState.WriteStateAsync();
+            await _balanceState.PerformUpdate(state =>
+            {
+                state.Balance += amount;
+            });
         }
 
         public async Task Debit(decimal amount)
         {
-            var currentBalance = _balanceState.State.Balance;
-
-            var newstate = currentBalance - amount;
-
-            _balanceState.State.Balance = newstate;
-
-            await _balanceState.WriteStateAsync();
+            await _balanceState.PerformUpdate(state =>
+            {
+                state.Balance -= amount;
+            });
         }
 
         public async Task<decimal> GetBalance()
         {
-            return _balanceState.State.Balance;
+            return await _balanceState.PerformRead(state => state.Balance);
         }
 
         public async Task Initialize(decimal openingBalance)
         {
+            var balanceUpdate = _balanceState.PerformUpdate(state =>
+            {
+                state.Balance = openingBalance;
+            });
+
             _checkingAccountState.State.CreatedAtUtc = DateTime.UtcNow;
             _checkingAccountState.State.AccountType = "Default";
             _checkingAccountState.State.Accountid = this.GetGrainId().GetGuidKey();
 
-            _balanceState.State.Balance = openingBalance;
+            var checkingAccountUpdate = _checkingAccountState.WriteStateAsync();
+
+            await Task.WhenAll(balanceUpdate, checkingAccountUpdate);
         }
 
         public async Task ReceiveReminder(string reminderName, TickStatus status)
@@ -77,7 +84,10 @@ namespace BankingApplication.Grains.Grains
 
                 var reccuringPayment = _checkingAccountState.State.ReccuringPayments.Where(p => p.PaymentId == reccuringPaymentId).Single();
 
-                await Debit(reccuringPayment.Amount);
+                await _transactionClient.RunTransaction(transactionOption: TransactionOption.Create, async () =>
+                {
+                    await Debit(reccuringPayment.Amount);
+                });
             }
         }
     }

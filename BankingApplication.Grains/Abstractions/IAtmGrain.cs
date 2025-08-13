@@ -8,7 +8,9 @@ namespace BankingApplication.Grains.Abstractions
 {
     public interface IAtmGrain:  IGrainWithGuidKey
     {
+        [Transaction(TransactionOption.Create)]
         public Task Initialize(decimal openingBalance);
+        [Transaction(TransactionOption.CreateOrJoin)]
         public Task Withdraw(Guid CheckingAccountId, decimal amount);
     }
 }

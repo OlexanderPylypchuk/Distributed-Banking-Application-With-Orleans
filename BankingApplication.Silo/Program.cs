@@ -33,6 +33,13 @@ await Host.CreateDefaultBuilder(args)
             });
         });
 
+        siloBuilder.AddAzureTableTransactionalStateStorageAsDefault(configureOptions: options =>
+        {
+            options.TableServiceClient = new Azure.Data.Tables.TableServiceClient("UseDevelopmentStorage=true;");
+        });
+
+        siloBuilder.UseTransactions();
+
         //siloBuilder.Configure<GrainCollectionOptions>(options =>
         //{
         //    options.CollectionQuantum = TimeSpan.FromSeconds(20);

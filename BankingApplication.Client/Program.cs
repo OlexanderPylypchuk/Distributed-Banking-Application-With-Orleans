@@ -1,6 +1,7 @@
 using BankingApplication.Client.Contracts;
 using BankingApplication.Grains.Abstractions;
 using BankingApplication.Grains.Grains;
+using Microsoft.AspNetCore.Mvc;
 using Orleans.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,6 +13,8 @@ builder.Host.UseOrleansClient((context, client) =>
         options.TableServiceClient = new Azure.Data.Tables.TableServiceClient("UseDevelopmentStorage=true;");
     });
 
+    client.UseTransactions();
+
     client.Configure<ClusterOptions>(options =>
     {
         options.ClusterId = "Cluster";
@@ -22,45 +25,64 @@ builder.Host.UseOrleansClient((context, client) =>
 
 var app = builder.Build();
 
-app.MapGet("checkingaccount/{checkingAccountId}/balance", async (Guid checkingAccountId, IClusterClient client) =>
+app.MapGet("checkingaccount/{checkingAccountId}/balance",
+    async (Guid checkingAccountId, IClusterClient client, [FromServices] ITransactionClient transactionClient) =>
 {
-    var checkinAccountGrain = client.GetGrain<ICheckingAccountGrain>(checkingAccountId);
+    decimal balance = 0;
 
-    var balance = await checkinAccountGrain.GetBalance();
+    await transactionClient.RunTransaction(TransactionOption.Create, async () =>
+    {
+        var checkinAccountGrain = client.GetGrain<ICheckingAccountGrain>(checkingAccountId);
+
+        balance = await checkinAccountGrain.GetBalance();
+    });
 
     return TypedResults.Ok(balance);
 });
 
-app.MapPost("checkingaccount", async (IClusterClient client, CreateAccount createAccount) =>
+app.MapPost("checkingaccount",
+    async (IClusterClient client, CreateAccount createAccount, [FromServices] ITransactionClient transactionClient) =>
 {
     var checkingAccountId = Guid.NewGuid();
 
-    var checkinAccountGrain = client.GetGrain<ICheckingAccountGrain>(checkingAccountId);
+    await transactionClient.RunTransaction(TransactionOption.Create, async () =>
+    {
+        var checkinAccountGrain = client.GetGrain<ICheckingAccountGrain>(checkingAccountId);
 
-    await checkinAccountGrain.Initialize(createAccount.OpeningBalance);
+        await checkinAccountGrain.Initialize(createAccount.OpeningBalance);
+    });
 
     return TypedResults.Created($"checkingaccount/{checkingAccountId}");
 });
 
-app.MapPost("checkingaccount/{checkingAccountId}/debit", async (Guid checkingAccountId, IClusterClient client, Debit debit) =>
+app.MapPost("checkingaccount/{checkingAccountId}/debit",
+    async (Guid checkingAccountId, IClusterClient client, Debit debit, [FromServices] ITransactionClient transactionClient) =>
 {
-    var checkinAccountGrain = client.GetGrain<ICheckingAccountGrain>(checkingAccountId);
+    await transactionClient.RunTransaction(TransactionOption.Create, async () =>
+    {
+        var checkinAccountGrain = client.GetGrain<ICheckingAccountGrain>(checkingAccountId);
 
-    await checkinAccountGrain.Debit(debit.Amount);
+        await checkinAccountGrain.Debit(debit.Amount);
+    });
 
     return TypedResults.NoContent();
 });
 
-app.MapPost("checkingaccount/{checkingAccountId}/credit", async (Guid checkingAccountId, IClusterClient client, Credit credit) =>
+app.MapPost("checkingaccount/{checkingAccountId}/credit",
+    async (Guid checkingAccountId, IClusterClient client, Credit credit, [FromServices] ITransactionClient transactionClient) =>
 {
-    var checkinAccountGrain = client.GetGrain<ICheckingAccountGrain>(checkingAccountId);
+    await transactionClient.RunTransaction(TransactionOption.Create, async () =>
+    {
+        var checkinAccountGrain = client.GetGrain<ICheckingAccountGrain>(checkingAccountId);
 
-    await checkinAccountGrain.Credit(credit.Amount);
+        await checkinAccountGrain.Credit(credit.Amount);
+    });
 
     return TypedResults.NoContent();
 });
 
-app.MapPost("checkingaccount/{checkingAccountId}/reccuringPayment", async (Guid checkingAccountId, IClusterClient client, CreateReccuringPayment createReccuringPayment) =>
+app.MapPost("checkingaccount/{checkingAccountId}/reccuringPayment",
+    async (Guid checkingAccountId, IClusterClient client, CreateReccuringPayment createReccuringPayment) =>
 {
     var checkinAccountGrain = client.GetGrain<ICheckingAccountGrain>(checkingAccountId);
 
@@ -69,22 +91,30 @@ app.MapPost("checkingaccount/{checkingAccountId}/reccuringPayment", async (Guid 
     return TypedResults.NoContent();
 });
 
-app.MapPost("atm", async (IClusterClient client, CreateAtm createAtm) =>
+app.MapPost("atm",
+    async (IClusterClient client, CreateAtm createAtm, [FromServices] ITransactionClient transactionClient) =>
 {
     var atmId = Guid.NewGuid();
 
-    var atmGrain = client.GetGrain<IAtmGrain>(atmId);
+    await transactionClient.RunTransaction(TransactionOption.Create, async () =>
+    {
+        var atmGrain = client.GetGrain<IAtmGrain>(atmId);
 
-    await atmGrain.Initialize(createAtm.OpeningBalance);
+        await atmGrain.Initialize(createAtm.OpeningBalance);
+    });
 
     return TypedResults.Created($"atm/{atmId}");
 });
 
-app.MapPost("atm/{atmId}/credit", async (Guid atmId, IClusterClient client, AtmWithdrawl withdrawl) =>
+app.MapPost("atm/{atmId}/credit",
+    async (Guid atmId, IClusterClient client, AtmWithdrawl withdrawl,[FromServices] ITransactionClient transactionClient) =>
 {
-    var atmGrain = client.GetGrain<IAtmGrain>(atmId);
+    await transactionClient.RunTransaction(TransactionOption.Create, async () =>
+    {
+        var atmGrain = client.GetGrain<IAtmGrain>(atmId);
 
-    await atmGrain.Withdraw(withdrawl.CheckingAccountId, withdrawl.Amount);
+        await atmGrain.Withdraw(withdrawl.CheckingAccountId, withdrawl.Amount);
+    });
 
     return TypedResults.NoContent();
 });
