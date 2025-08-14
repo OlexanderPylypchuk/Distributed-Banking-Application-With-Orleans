@@ -1,6 +1,6 @@
 using BankingApplication.Client.Contracts;
 using BankingApplication.Grains.Abstractions;
-using BankingApplication.Grains.Grains;
+using BankingApplication.Grains.Filters;
 using Microsoft.AspNetCore.Mvc;
 using Orleans.Configuration;
 
@@ -20,6 +20,8 @@ builder.Host.UseOrleansClient((context, client) =>
         options.ClusterId = "Cluster";
         options.ServiceId = "Service";
     });
+
+    client.AddOutgoingGrainCallFilter<LoggingOutgoingGrainLogFilter>();
 });
 
 

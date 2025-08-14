@@ -1,4 +1,5 @@
 ﻿using Azure.Storage.Queues;
+using BankingApplication.Grains.Filters;
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 
@@ -52,6 +53,8 @@ await Host.CreateDefaultBuilder(args)
         {
             options.TableServiceClient = new Azure.Data.Tables.TableServiceClient("UseDevelopmentStorage=true;");
         });
+
+        siloBuilder.AddIncomingGrainCallFilter<LoggingFilter>();
 
         //siloBuilder.Configure<GrainCollectionOptions>(options =>
         //{
