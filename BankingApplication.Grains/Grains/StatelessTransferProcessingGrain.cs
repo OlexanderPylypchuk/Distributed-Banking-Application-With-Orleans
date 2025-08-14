@@ -1,22 +1,35 @@
 ﻿using BankingApplication.Grains.Abstractions;
 using BankingApplication.Grains.States;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Orleans.Concurrency;
 
 namespace BankingApplication.Grains.Grains
 {
+    [StatelessWorker]
     public class StatelessTransferProcessingGrain : Grain, IStatelessTransferProcessingGrain
     {
-        public StatelessTransferProcessingGrain([PersistentState("transfer", "TableStorage")]  IPersistentState<TransferState> transferState)
+        private readonly IPersistentState<TransferState> _transferState;
+        private readonly ITransactionClient _transactionClient;
+
+        public StatelessTransferProcessingGrain([PersistentState("transfer", "TableStorage")]  IPersistentState<TransferState> transferState, ITransactionClient transactionClient)
         {
-            
+            _transferState = transferState;
+            _transactionClient = transactionClient;
         }
-        public Task ProcessTransfer(Guid fromAccountId, Guid toAccountId, decimal amount)
+
+        public async Task ProcessTransfer(Guid fromAccountId, Guid toAccountId, decimal amount)
         {
-            throw new NotImplementedException();
+            var fromAccountGrain = this.GrainFactory.GetGrain<CheckingAccountGrain>(fromAccountId);
+            var toAccountGrain = this.GrainFactory.GetGrain<CheckingAccountGrain>(toAccountId);
+
+            await _transactionClient.RunTransaction(TransactionOption.Create, async () =>
+            {
+                await fromAccountGrain.Debit(amount);
+                await toAccountGrain.Credit(amount);
+            });
+
+            _transferState.State.TransferCount += 1;
+
+            await _transferState.WriteStateAsync();
         }
     }
 }

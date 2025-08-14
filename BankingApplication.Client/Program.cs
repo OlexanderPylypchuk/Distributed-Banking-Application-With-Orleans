@@ -139,6 +139,16 @@ app.MapPost("customer/{customerId}/addcheckingaccount",
         return TypedResults.NoContent();
     });
 
+app.MapPost("transfer",
+    async (TransferRecord transfer, IClusterClient client) =>
+    {
+        var customerGrain = client.GetGrain<IStatelessTransferProcessingGrain>(0);
+
+        await customerGrain.ProcessTransfer(transfer.fromAccountId, transfer.toAccountId, transfer.Amount);
+
+        return TypedResults.NoContent();
+    });
+
 
 
 app.Run();
