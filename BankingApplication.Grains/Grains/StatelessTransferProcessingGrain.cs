@@ -18,8 +18,8 @@ namespace BankingApplication.Grains.Grains
 
         public async Task ProcessTransfer(Guid fromAccountId, Guid toAccountId, decimal amount)
         {
-            var fromAccountGrain = this.GrainFactory.GetGrain<CheckingAccountGrain>(fromAccountId);
-            var toAccountGrain = this.GrainFactory.GetGrain<CheckingAccountGrain>(toAccountId);
+            var fromAccountGrain = this.GrainFactory.GetGrain<ICheckingAccountGrain>(fromAccountId);
+            var toAccountGrain = this.GrainFactory.GetGrain<ICheckingAccountGrain>(toAccountId);
 
             await _transactionClient.RunTransaction(TransactionOption.Create, async () =>
             {
