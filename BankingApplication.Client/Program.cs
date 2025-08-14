@@ -119,6 +119,26 @@ app.MapPost("atm/{atmId}/credit",
     return TypedResults.NoContent();
 });
 
+app.MapGet("customer/{customerId}/networth",
+    async (Guid customerId, IClusterClient client) =>
+    {
+        var customerGrain = client.GetGrain<ICustomerGrain>(customerId);
+
+        var networth = await customerGrain.GetNetWorth();
+
+        return TypedResults.Ok(networth);
+    });
+
+app.MapPost("customer/{customerId}/addcheckingaccount",
+    async (Guid customerId, IClusterClient client, CustomerCheckingAccount customerCheckingAccount) =>
+    {
+        var customerGrain = client.GetGrain<ICustomerGrain>(customerId);
+
+        await customerGrain.AddCheckingAccount(customerCheckingAccount.AccountId);
+
+        return TypedResults.NoContent();
+    });
+
 
 
 app.Run();

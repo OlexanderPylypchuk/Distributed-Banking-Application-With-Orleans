@@ -1,4 +1,5 @@
 ﻿using BankingApplication.Grains.Abstractions;
+using BankingApplication.Grains.Events;
 using BankingApplication.Grains.States;
 using Orleans.Concurrency;
 using Orleans.Transactions.Abstractions;
@@ -45,6 +46,8 @@ namespace BankingApplication.Grains.Grains
             {
                 state.Balance += amount;
             });
+
+            await TriggerChangeBalanceEvent();
         }
 
         public async Task Debit(decimal amount)
@@ -52,6 +55,22 @@ namespace BankingApplication.Grains.Grains
             await _balanceState.PerformUpdate(state =>
             {
                 state.Balance -= amount;
+            });
+
+            await TriggerChangeBalanceEvent();
+        }
+        private async Task TriggerChangeBalanceEvent()
+        {
+            var streamProvider = this.GetStreamProvider("streamProvider");
+
+            var streamId = StreamId.Create("BalanceStream", this.GetGrainId().GetGuidKey());
+
+            var stream = streamProvider.GetStream<BalanceChangeEvent>(streamId);
+
+            await stream.OnNextAsync(new BalanceChangeEvent()
+            {
+                CheckingAccountId = this.GetGrainId().GetGuidKey(),
+                Balance = await GetBalance()
             });
         }
 
